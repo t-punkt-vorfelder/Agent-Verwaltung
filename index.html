@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║  Verwaltungsrecht KI-Assistent  –  Standalone PWA               ║
+  ║  DSGVO-Hinweise:                                                 ║
+  ║  • Keine Tracker, kein Google, kein Meta, kein Amazon           ║
+  ║  • Keine externen Schriften oder CDN-Ressourcen                  ║
+  ║  • API-Key wird ausschließlich im lokalen Browser gespeichert    ║
+  ║  • Einzige Netzwerkverbindung: api.anthropic.com (notwendig)     ║
+  ║                                                                  ║
+  ║  Fira Code Font:                                                 ║
+  ║  Die Schriftart wird aus der lokalen Systeminstallation          ║
+  ║  geladen (local('Fira Code')). Kein externer Abruf.             ║
+  ║  Download: https://github.com/tonsky/FiraCode/releases           ║
+  ╚══════════════════════════════════════════════════════════════════╝
+-->
+
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="VwR" />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Verwaltungsrecht Assistent</title>
+
+  <style>
+    /* ────────────────────────────────────────
+       Fira Code – nur lokale Systeminstallation
+       Kein externer Abruf, DSGVO-konform
+    ──────────────────────────────────────── */
+    @font-face {
+      font-family: 'FiraCode';
+      src: local('Fira Code'), local('FiraCode'), local('FiraCode-Regular');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'FiraCode';
+      src: local('Fira Code Medium'), local('FiraCode-Medium');
+      font-weight: 500;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'FiraCode';
+      src: local('Fira Code Bold'), local('FiraCode-Bold');
+      font-weight: 700;
+      font-style: normal;
+    }
+
+    /* ── Variablen ── */
+    :root {
+      --font: 'FiraCode', 'Cascadia Code', 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+      --gold:      #c9a84c;
+      --gold-soft: rgba(201,168,76,0.22);
+      --gold-faint:rgba(201,168,76,0.08);
+      --bg:        #0d1117;
+      --bg2:       #111823;
+      --bg3:       rgba(255,255,255,0.04);
+      --border:    rgba(201,168,76,0.18);
+      --text:      #cdd3cc;
+      --text-dim:  rgba(180,185,175,0.45);
+      --blue:      #1d3557;
+      --blue-light:#2d5a9a;
+      --red-bg:    rgba(160,40,40,0.18);
+      --red-border:rgba(200,80,80,0.35);
+      --red-text:  #f08888;
+      --safe-top:   env(safe-area-inset-top,  0px);
+      --safe-bottom:env(safe-area-inset-bottom,0px);
+      --safe-left:  env(safe-area-inset-left,  0px);
+      --safe-right: env(safe-area-inset-right,  0px);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13.5px;
+      line-height: 1.65;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    /* ── Layout ── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      height: 100dvh;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    /* ── Hintergrundmuster ── */
+    #app::before {
+      content: '§';
+      position: fixed; top: 8%; right: 4%;
+      font-size: 200px; opacity: 0.018; color: var(--gold);
+      pointer-events: none; user-select: none;
+      animation: breathe 6s ease-in-out infinite;
+    }
+    @keyframes breathe { 0%,100%{opacity:.018} 50%{opacity:.03} }
+
+    /* ════════════════════════════
+       API-KEY OVERLAY
+    ════════════════════════════ */
+    #key-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    #key-overlay.hidden { display: none; }
+
+    .key-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px 28px;
+      max-width: 460px; width: 100%;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+    .key-card h1 {
+      font-size: 18px; color: var(--gold); font-weight: 600;
+      letter-spacing: .5px;
+    }
+    .key-card p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+    .key-card p a { color: var(--gold); text-decoration: none; }
+    .key-card p a:hover { text-decoration: underline; }
+
+    .key-note {
+      background: var(--gold-faint);
+      border: 1px solid var(--gold-soft);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 12px; color: rgba(201,168,76,0.8);
+      line-height: 1.6;
+    }
+
+    .key-input-row {
+      display: flex; gap: 8px;
+    }
+    .key-input {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 14px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .key-input:focus { border-color: var(--gold-soft); }
+    .key-input::placeholder { color: var(--text-dim); }
+
+    .key-btn {
+      padding: 11px 20px;
+      background: linear-gradient(135deg, var(--gold), #a07828);
+      border: none; border-radius: 10px;
+      color: #0d1117; font-family: var(--font); font-size: 13px;
+      font-weight: 600; cursor: pointer;
+      transition: opacity .2s;
+      white-space: nowrap;
+    }
+    .key-btn:hover { opacity: .85; }
+    .key-btn:disabled { opacity: .35; cursor: default; }
+
+    .key-error { color: var(--red-text); font-size: 12px; display: none; }
+
+    /* ════════════════════════════
+       HEADER
+    ════════════════════════════ */
+    #header {
+      flex-shrink: 0;
+      padding: calc(10px + var(--safe-top)) calc(16px + var(--safe-right)) 10px calc(16px + var(--safe-left));
+      border-bottom: 1px solid var(--border);
+      background: rgba(13,17,23,0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      display: flex; align-items: center; gap: 12px;
+      position: sticky; top: 0; z-index: 10;
+    }
+
+    .h-icon {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: linear-gradient(135deg,#162336,#1e3a5f);
+      border: 1px solid var(--gold);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; flex-shrink: 0;
+    }
+    .h-title { color: var(--gold); font-size: 15px; font-weight: 600; letter-spacing: .4px; }
+    .h-sub   { color: var(--text-dim); font-size: 10.5px; margin-top: 2px; }
+
+    .h-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .online-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #3fb950; box-shadow: 0 0 6px #3fb950;
+    }
+    .online-label { color: var(--text-dim); font-size: 10.5px; }
+
+    .reset-btn {
+      background: none; border: 1px solid var(--border);
+      border-radius: 7px; padding: 4px 10px;
+      color: var(--text-dim); font-family: var(--font);
+      font-size: 11px; cursor: pointer;
+      transition: border-color .2s, color .2s;
+    }
+    .reset-btn:hover { border-color: var(--gold-soft); color: var(--gold); }
+
+    /* ════════════════════════════
+       MESSAGES
+    ════════════════════════════ */
+    #messages {
+      flex: 1; overflow-y: auto;
+      padding: 20px calc(14px + var(--safe-right)) 12px calc(14px + var(--safe-left));
+      display: flex; flex-direction: column;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-thumb { background: rgba(201,168,76,.2); border-radius: 3px; }
+
+    .msg-row {
+      display: flex;
+      margin-bottom: 16px;
+      animation: pop .3s ease forwards;
+    }
+    .msg-row.user { justify-content: flex-end; }
+    .msg-row.bot  { justify-content: flex-start; }
+    @keyframes pop { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:none} }
+
+    .m-av {
+      width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+    .bot  .m-av { background: linear-gradient(135deg,#162336,#1e3a5f); border: 1px solid var(--gold); margin-right: 9px; }
+    .user .m-av { background: linear-gradient(135deg,#1d3557,#14253d); border: 1px solid var(--blue-light); margin-left: 9px; }
+
+    .bubble {
+      max-width: 80%;
+      padding: 11px 15px;
+      font-size: 13.5px; line-height: 1.7;
+    }
+    .bot  .bubble {
+      border-radius: 14px 14px 14px 3px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+    }
+    .user .bubble {
+      border-radius: 14px 14px 3px 14px;
+      background: linear-gradient(135deg, #1d3557, #142240);
+      border: 1px solid #1e3f6a;
+    }
+    .bubble strong { color: var(--gold); font-weight: 600; }
+    .bullet { padding-left: 10px; border-left: 2px solid var(--gold); margin-bottom: 3px; }
+    .gap    { height: 7px; }
+    .para   { margin-bottom: 2px; }
+
+    /* Zitat / Gesetzestext */
+    .legal-quote {
+      margin: 6px 0;
+      padding: 8px 12px;
+      background: rgba(201,168,76,0.06);
+      border-left: 3px solid var(--gold);
+      border-radius: 0 6px 6px 0;
+      font-size: 12.5px;
+      color: rgba(201,168,76,.75);
+    }
+
+    /* ── Tipp-Indikator ── */
+    .typing-row { display: flex; align-items: center; margin-bottom: 16px; }
+    .typing-row .m-av { background: linear-gradient(135deg,#162336,#1e3a5f); border: 1px solid var(--gold); margin-right: 9px; }
+    .typing-bubble {
+      padding: 11px 16px;
+      border-radius: 14px 14px 14px 3px;
+      background: var(--bg3); border: 1px solid var(--border);
+      display: flex; gap: 5px; align-items: center;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); animation: blink 1.1s ease-in-out infinite; }
+    .dot:nth-child(2){ animation-delay:.18s }
+    .dot:nth-child(3){ animation-delay:.36s }
+    @keyframes blink { 0%,80%,100%{transform:scale(.65);opacity:.4} 40%{transform:scale(1);opacity:1} }
+
+    /* ── Vorschläge ── */
+    #suggestions {
+      padding: 2px 0 14px;
+      animation: pop .5s ease .25s both;
+    }
+    .sug-label { color: var(--text-dim); font-size: 11px; text-align: center; margin-bottom: 9px; }
+    .sug-wrap  { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+    .sug-btn {
+      padding: 7px 13px;
+      background: var(--gold-faint); border: 1px solid var(--gold-soft);
+      border-radius: 20px; color: var(--gold);
+      font-size: 12px; font-family: var(--font);
+      cursor: pointer; transition: background .15s, border-color .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .sug-btn:active, .sug-btn:hover {
+      background: rgba(201,168,76,.16); border-color: rgba(201,168,76,.55);
+    }
+
+    /* ── Fehler ── */
+    .err-box {
+      padding: 11px 15px; border-radius: 9px;
+      background: var(--red-bg); border: 1px solid var(--red-border);
+      color: var(--red-text); font-size: 12.5px; margin-bottom: 14px;
+    }
+
+    /* ════════════════════════════
+       INPUT-LEISTE
+    ════════════════════════════ */
+    #input-area {
+      flex-shrink: 0;
+      padding: 10px calc(14px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(14px + var(--safe-left));
+      border-top: 1px solid var(--border);
+      background: rgba(13,17,23,0.95);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .i-row { display: flex; gap: 8px; align-items: flex-end; }
+    .i-wrap {
+      flex: 1;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 13px; padding: 10px 14px;
+      transition: border-color .2s;
+    }
+    .i-wrap:focus-within { border-color: var(--gold-soft); }
+    #user-input {
+      width: 100%; background: transparent; border: none; outline: none;
+      color: var(--text); font-family: var(--font); font-size: 13.5px;
+      line-height: 1.5; resize: none; display: block;
+      max-height: 110px; overflow-y: auto;
+    }
+    #user-input::placeholder { color: var(--text-dim); }
+    #user-input::-webkit-scrollbar { width: 3px; }
+    #user-input::-webkit-scrollbar-thumb { background: rgba(201,168,76,.2); border-radius: 2px; }
+
+    #send-btn {
+      width: 42px; height: 42px; border-radius: 50%;
+      border: none; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: all .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #send-btn.on  { background: linear-gradient(135deg,var(--gold),#a07828); color: #0d1117; box-shadow: 0 2px 12px rgba(201,168,76,.3); }
+    #send-btn.off { background: rgba(201,168,76,.12); color: rgba(201,168,76,.35); cursor: default; }
+
+    .i-hint {
+      text-align: center; color: rgba(180,185,175,.22);
+      font-size: 10.5px; margin-top: 8px;
+      letter-spacing: .2px;
+    }
+  </style>
+
+</head>
+<body>
+
+<!-- ══════════════════════════════
+     API-KEY OVERLAY
+══════════════════════════════ -->
+
+<div id="key-overlay">
+  <div class="key-card">
+    <h1>⚖ Verwaltungsrecht Assistent</h1>
+    <p>
+      Für den Betrieb benötigt die App Ihren persönlichen
+      <strong style="color:var(--gold)">Anthropic API-Key</strong>.
+      Einen Key erhalten Sie unter
+      <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>.
+    </p>
+    <div class="key-note">
+      🔒 Datenschutz: Der Key wird ausschließlich in Ihrem
+      Browser-Speicher (localStorage) gespeichert und verlässt Ihr
+      Gerät nicht. Die einzige Netzwerkverbindung geht an
+      <strong>api.anthropic.com</strong> – kein Google, kein Meta,
+      kein Amazon, keine Tracker.
+    </div>
+    <div class="key-input-row">
+      <input id="key-input" class="key-input" type="password"
+             placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" />
+      <button class="key-btn" id="key-save-btn" onclick="saveKey()">Speichern</button>
+    </div>
+    <span class="key-error" id="key-error">Bitte einen gültigen API-Key eingeben (beginnt mit „sk-ant-").</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     HAUPT-APP
+══════════════════════════════ -->
+
+<div id="app">
+
+  <!-- Header -->
+
+  <div id="header">
+    <div class="h-icon">⚖</div>
+    <div>
+      <div class="h-title">Verwaltungsrecht Assistent</div>
+      <div class="h-sub">VwVfG &nbsp;·&nbsp; VwGO &nbsp;·&nbsp; Öffentliches Recht</div>
+    </div>
+    <div class="h-right">
+      <div style="display:flex;align-items:center;gap:5px">
+        <div class="online-dot"></div>
+        <span class="online-label">Online</span>
+      </div>
+      <button class="reset-btn" onclick="resetChat()" title="Gespräch zurücksetzen">↺ Neu</button>
+    </div>
+  </div>
+
+  <!-- Nachrichten -->
+
+  <div id="messages"></div>
+
+  <!-- Eingabe -->
+
+  <div id="input-area">
+    <div class="i-row">
+      <div class="i-wrap">
+        <textarea id="user-input" rows="1"
+          placeholder="Frage zum Verwaltungsrecht stellen …"></textarea>
+      </div>
+      <button id="send-btn" class="off" onclick="send()">➤</button>
+    </div>
+    <div class="i-hint">Kein Ersatz für anwaltliche Beratung &nbsp;·&nbsp; Enter = Senden &nbsp;·&nbsp; Shift+Enter = Zeilenumbruch</div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+/* ── System-Prompt ── */
+const SYSTEM = `Du bist ein hochspezialisierter KI-Assistent für deutsches Verwaltungsrecht und Verwaltungsprozessrecht.
+
+MATERIELLES VERWALTUNGSRECHT:
+- Allgemeines Verwaltungsrecht: VwVfG, Verwaltungsakt (§ 35 VwVfG), öffentlich-rechtlicher Vertrag, Zusicherung, Nebenbestimmungen (§ 36 VwVfG)
+- Fehlerfolgen: Nichtigkeit (§ 44 VwVfG), Anfechtbarkeit, Rücknahme (§ 48 VwVfG), Widerruf (§ 49 VwVfG)
+- Ermessen und Ermessensfehler (Ermessensausfall, -überschreitung, -missbrauch)
+- Unbestimmte Rechtsbegriffe und Beurteilungsspielraum
+- Grundrechtsbindung der Verwaltung (Art. 1 III, 20 III GG)
+- Polizei- und Ordnungsrecht (Generalklausel, Standardmaßnahmen, Verhältnismäßigkeit)
+- Baurecht: BauGB, BauNVO, Landesbauordnungen; Baugenehmigung, Nachbarschutz
+- Beamtenrecht: BeamtStG, BBG, Disziplinarrecht
+- Kommunalrecht: GO, Gemeindehoheiten, Kommunalaufsicht
+- Subventionsrecht und Zuwendungsrecht
+
+VERWALTUNGSPROZESSRECHT (VwGO):
+- Eröffnung des Verwaltungsrechtswegs (§ 40 VwGO), Abgrenzung Zivil-/Verwaltungsrechtsweg
+- Klagearten: Anfechtungsklage (§ 42 I Var. 1), Verpflichtungsklage (§ 42 I Var. 2), allgemeine Leistungsklage, Feststellungsklage (§ 43), Normenkontrolle (§ 47)
+- Zulässigkeit: Klagebefugnis (§ 42 II), Vorverfahren (§§ 68 ff.), Klagefrist (§ 74), Klagegegner (§ 78)
+- Einstweiliger Rechtsschutz: aufschiebende Wirkung (§ 80), Wiederherstellung (§ 80 V), Anordnung der sofortigen Vollziehung (§ 80 II), einstweilige Anordnung (§ 123)
+- Begründetheit: Rechtmäßigkeit des VA, Spruchreife, Ermessensreduzierung auf Null
+- Kostenrecht, Streitwert, Rechtsmittel (Berufung, Revision, Beschwerde)
+
+ARBEITSMETHODIK:
+- Juristische Gutachtentechnik: Obersatz → Definition → Subsumtion → Ergebnis
+- Klare Gliederung mit Zwischenergebnissen
+- Hinweis auf herrschende Meinung (h.M.) und relevante Gegenmeinungen
+- Aktuelle BVerwG-, BVerfG- und OVG-Rechtsprechung einbeziehen
+- Stets auf Deutsch antworten
+- Bei Fragen mit erheblicher praktischer Tragweite auf anwaltliche Beratung hinweisen`;
+
+const WELCOME = `Guten Tag!
+
+Ich bin Ihr Assistent für **deutsches Verwaltungsrecht** und **Verwaltungsprozessrecht**.
+
+Ich helfe Ihnen bei:
+
+- **VwVfG** – Verwaltungsakt, Nebenbestimmungen, Fehlerfolgen, Rücknahme & Widerruf
+- **VwGO** – Klagearten, Zulässigkeit, einstweiliger Rechtsschutz, Normenkontrolle
+- **Besonderes Verwaltungsrecht** – Baurecht, Polizeirecht, Beamtenrecht, Kommunalrecht
+- **Gutachtenaufbau** – strukturierte Prüfungen nach juristischer Methodik
+- **Rechtsprechung** – BVerwG, BVerfG, OVG-Entscheidungen
+
+Wie kann ich Ihnen heute behilflich sein?`;
+
+const SUGGESTIONS = [
+  'Was ist ein Verwaltungsakt (§ 35 VwVfG)?',
+  'Anfechtungsklage – Aufbau und Zulässigkeit',
+  'Einstweiliger Rechtsschutz nach § 80 VwGO',
+  'Ermessensfehler: Arten und Rechtsfolgen',
+  'Rücknahme vs. Widerruf (§§ 48, 49 VwVfG)',
+];
+
+/* ── State ── */
+let history  = [];
+let loading  = false;
+let apiKey   = '';
+
+/* ════════════════════════════
+   API-KEY
+════════════════════════════ */
+function loadKey() {
+  try { apiKey = localStorage.getItem('vwr_apikey') || ''; } catch(e) { apiKey = ''; }
+  if (apiKey) {
+    document.getElementById('key-overlay').classList.add('hidden');
+    renderWelcome();
+  }
+}
+
+function saveKey() {
+  const val = document.getElementById('key-input').value.trim();
+  const err = document.getElementById('key-error');
+  if (!val.startsWith('sk-ant-') && !val.startsWith('sk-')) {
+    err.style.display = 'block'; return;
+  }
+  err.style.display = 'none';
+  apiKey = val;
+  try { localStorage.setItem('vwr_apikey', val); } catch(e) {}
+  document.getElementById('key-overlay').classList.add('hidden');
+  renderWelcome();
+}
+
+function resetKey() {
+  try { localStorage.removeItem('vwr_apikey'); } catch(e) {}
+  apiKey = '';
+  document.getElementById('key-overlay').classList.remove('hidden');
+  document.getElementById('key-input').value = '';
+}
+
+/* ════════════════════════════
+   TEXT-FORMATIERUNG
+════════════════════════════ */
+function fmt(text) {
+  const lines = text.split('\n');
+  let html = '';
+  lines.forEach(line => {
+    if (line === '') { html += '<div class="gap"></div>'; return; }
+    // bold
+    line = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // inline code / Paragraphen
+    line = line.replace(/`([^`]+)`/g, '<code style="background:rgba(201,168,76,.12);padding:1px 5px;border-radius:4px;font-size:.95em;">$1</code>');
+    if (line.startsWith('- ')) {
+      html += `<div class="bullet">${line.slice(2)}</div>`;
+    } else if (/^#+\s/.test(line)) {
+      const t = line.replace(/^#+\s/, '');
+      html += `<div style="color:var(--gold);font-weight:600;margin:6px 0 3px;">${t}</div>`;
+    } else if (line.startsWith('> ')) {
+      html += `<div class="legal-quote">${line.slice(2)}</div>`;
+    } else {
+      html += `<div class="para">${line}</div>`;
+    }
+  });
+  return html;
+}
+
+/* ════════════════════════════
+   NACHRICHTEN RENDERN
+════════════════════════════ */
+function addMsg(role, text, animate = true) {
+  const box = document.getElementById('messages');
+
+  const sug = document.getElementById('suggestions');
+  if (sug && role === 'user') sug.remove();
+
+  const row = document.createElement('div');
+  row.className = `msg-row ${role === 'user' ? 'user' : 'bot'}`;
+  if (!animate) row.style.animation = 'none';
+
+  const av  = document.createElement('div'); av.className = 'm-av';
+  av.textContent = role === 'user' ? '◉' : '⚖';
+
+  const bub = document.createElement('div'); bub.className = 'bubble';
+  bub.innerHTML = fmt(text);
+
+  if (role === 'user') { row.append(bub, av); }
+  else                 { row.append(av,  bub); }
+
+  box.appendChild(row);
+  box.scrollTop = box.scrollHeight;
+}
+
+function showTyping() {
+  const box = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'typing-row'; row.id = 'typing';
+  row.innerHTML =
+    `<div class="m-av" style="background:linear-gradient(135deg,#162336,#1e3a5f);border:1px solid var(--gold);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-right:9px;">⚖</div>
+     <div class="typing-bubble"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+  box.appendChild(row);
+  box.scrollTop = box.scrollHeight;
+}
+function hideTyping() { document.getElementById('typing')?.remove(); }
+
+function showErr(msg) {
+  const box = document.getElementById('messages');
+  const d = document.createElement('div');
+  d.className = 'err-box'; d.textContent = '⚠ ' + msg;
+  box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+
+function renderWelcome() {
+  const box = document.getElementById('messages');
+  box.innerHTML = '';
+  history = [];
+  addMsg('assistant', WELCOME, false);
+
+  const sug = document.createElement('div');
+  sug.id = 'suggestions';
+  sug.innerHTML = `<div class="sug-label">— Vorschläge zum Einstieg —</div><div class="sug-wrap">
+    ${SUGGESTIONS.map(s =>
+      `<button class="sug-btn" onclick="quickSend(this)">${s}</button>`
+    ).join('')}
+  </div>`;
+  box.appendChild(sug);
+}
+
+function quickSend(btn) {
+  send(btn.textContent);
+}
+
+/* ════════════════════════════
+   NACHRICHT SENDEN
+════════════════════════════ */
+async function send(preset) {
+  const ta   = document.getElementById('user-input');
+  const text = preset ?? ta.value.trim();
+  if (!text || loading) return;
+
+  ta.value = ''; ta.style.height = 'auto'; updateBtn();
+  loading = true;
+
+  addMsg('user', text);
+  history.push({ role: 'user', content: text });
+  showTyping();
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model:      'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system:     SYSTEM,
+        messages:   history,
+      }),
+    });
+
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message);
+    const reply = data.content?.find(b => b.type === 'text')?.text
+                  || 'Keine Antwort erhalten.';
+
+    hideTyping();
+    addMsg('assistant', reply);
+    history.push({ role: 'assistant', content: reply });
+
+  } catch (e) {
+    hideTyping();
+    if (e.message?.includes('401') || e.message?.toLowerCase().includes('auth')) {
+      showErr('API-Key ungültig oder abgelaufen. Bitte unter „⚙ Key" einen neuen Key eingeben.');
+    } else {
+      showErr('Verbindungsfehler: ' + e.message);
+    }
+  } finally {
+    loading = false;
+  }
+}
+
+function resetChat() {
+  if (confirm('Gespräch wirklich zurücksetzen?')) renderWelcome();
+}
+
+/* ════════════════════════════
+   EINGABE-STEUERUNG
+════════════════════════════ */
+function updateBtn() {
+  const val = document.getElementById('user-input').value.trim();
+  const btn = document.getElementById('send-btn');
+  btn.className = (val && !loading) ? 'on' : 'off';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const ta  = document.getElementById('user-input');
+  const ki  = document.getElementById('key-input');
+
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 110) + 'px';
+    updateBtn();
+  });
+
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  ki.addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveKey();
+  });
+
+  loadKey();
+});
+</script>
+
+</body>
+</html>
